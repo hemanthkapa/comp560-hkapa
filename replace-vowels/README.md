@@ -103,7 +103,7 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
 - Both 200 and 2000 iterations achieved near-identical results
 
 **Sample output:**
-![1-letter words, 2000 iterations](images/Screenshot%202026-01-31%20at%201.16.34%20AM.png)
+![1-letter words, 2000 iterations](images/screenshot_1letter_2000iter.png)
 
 ### Run 3: 2-letter words, max_iters=2000
 **Purpose:** Test model on 2-character words
@@ -119,7 +119,7 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
 - Loss stabilized at ~1.0-1.1 (higher than 1-letter, as expected)
 
 **Sample output:**
-![2-letter words, 2000 iterations](images/Screenshot%202026-01-31%20at%201.19.03%20AM.png)
+![2-letter words, 2000 iterations](images/screenshot_2letter_2000iter.png)
 
 ### Run 4: 3-letter words, max_iters=2000
 **Purpose:** Test model on 3-character words only
@@ -134,7 +134,7 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
 - Model successfully handles words with 0, 1, 2, or 3 vowels
 
 **Sample output:**
-![3-letter words, 2000 iterations](images/Screenshot%202026-01-31%20at%201.20.15%20AM.png)
+![3-letter words, 2000 iterations](images/screenshot_3letter_2000iter.png)
 
 ### Run 5: 3-letter words, max_iters=200
 **Purpose:** Compare 200 vs 2000 iterations for 3-letter words
@@ -147,7 +147,7 @@ NANOGPT_CONFIG=../../comp560-nanoGPT/configurator.py python -u ../../comp560-nan
 - Similar final loss to 2000 iterations (~1.1-1.2)
 - Faster initial convergence
 
-![3-letter words, 200 iterations](images/Screenshot%202026-01-31%20at%201.21.53%20AM.png)
+![3-letter words, 200 iterations](images/screenshot_3letter_200iter.png)
 
 ## Training Loss Graph (from Wandb)
 
