@@ -1,0 +1,84 @@
+import os
+import pickle
+import random
+import numpy as np
+
+# Three characters only - no single or two letter words
+WORD_LEN = 3
+alphabet = [c for c in 'abcdefghijklmnopqrstuvwxyz']
+
+
+target_length = 1_200_000  # about 1MB will be plenty of training data, with 0.2MB validation
+
+# construct a string consisting of repeated copies of the building_blocks in random order, 
+# such that it has length at least target_length
+total_length = 0
+lines = []
+vowels = 'aeiou'
+while total_length < target_length:
+    # Generate words of exactly 3 characters (no 1 or 2 letter words)
+    this_word_len = WORD_LEN  # Always 3 characters
+    characters = [random.choice(alphabet) for _ in range(this_word_len)]
+    word = ''.join(characters)
+    # replace vowels with *
+    masked_chars = [c if c not in vowels else '*' for c in characters]
+    masked_word = ''.join(masked_chars)
+    line = word + ': ' + masked_word + '\n'
+    lines.append(line)
+    total_length += len(line)
+
+print("First 20 lines of data:")
+for i in range(20):
+    print(lines[i].strip())
+
+data = ''.join(lines)
+print(f"length of dataset in characters: {len(data):,}")
+
+# get all the unique characters that occur in this text
+chars = sorted(list(set(data)))
+vocab_size = len(chars)
+print(f"all the unique characters: |{'|'.join(map(repr, chars))}|")
+print(f"vocab size: {vocab_size:,}")
+
+# create a mapping from characters to integers
+stoi = {ch: i for i, ch in enumerate(chars)}
+itos = {i: ch for i, ch in enumerate(chars)}
+
+
+def encode(s):
+    # encoder: take a string, output a list of integers
+    return [stoi[c] for c in s]
+
+
+def decode(l):
+    # decoder: take a list of integers, output a string
+    return ''.join([itos[i] for i in l])
+
+
+# split training and validation data 80/20
+tr_proportion = 0.8
+cutoff = int(len(lines) * tr_proportion)
+train_data = ''.join(lines[:cutoff])
+val_data = ''.join(lines[cutoff:])
+
+# encode both to integers
+train_ids = encode(train_data)
+val_ids = encode(val_data)
+print(f"train has {len(train_ids):,} tokens")
+print(f"val has {len(val_ids):,} tokens")
+
+# export to bin files
+train_ids = np.array(train_ids, dtype=np.uint16)
+val_ids = np.array(val_ids, dtype=np.uint16)
+train_ids.tofile(os.path.join(os.path.dirname(__file__), 'train.bin'))
+val_ids.tofile(os.path.join(os.path.dirname(__file__), 'val.bin'))
+
+# save the meta information as well, to help us encode/decode later
+meta = {
+    'vocab_size': vocab_size,
+    'itos': itos,
+    'stoi': stoi,
+}
+with open(os.path.join(os.path.dirname(__file__), 'meta.pkl'), 'wb') as f:
+    pickle.dump(meta, f)
+
