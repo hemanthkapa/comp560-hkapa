@@ -17,7 +17,11 @@ Multi-head attention is like having multiple "experts" look at the same text sim
 
 ### Feed-Forward networks
 - Feed-forward networks are neural networks where information moves only in one direction: from the input layer, through one or more hidden layers to the output layers. 
-- The 
+- The `PositionWiseFeedForward` is a small two-layer feedforward neural network (Linear → ReLU → Linear) that is applied to each token’s vector separately but with the same weights for all positions. It takes the features produced by attention at each position, expands them to a higher dimension, applies a nonlinearity, then projects back to the model dimension, helping the model learn more complex transformations of each token’s representation.
+
+### Postional Encoding
+- Positional encoding is a way to add order information to token embeddings so a Transformer can know which token is first, second, etc., even though self‑attention itself is order‑agnostic.
+- Here, a fixed matrix of sine and cosine waves at different frequencies is precomputed for positions 0…max_seq_length and dimensions 0…d_model−1, then the corresponding row is simply added to each token embedding, giving each position a unique, smoothly varying pattern the model can learn to interpret as position
 
 ## Vocab
 - Softmax: a fucntion that turns a list of real numbers into a list of probabilities that are all positive and sum to 1.
