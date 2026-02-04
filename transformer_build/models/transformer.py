@@ -59,3 +59,36 @@ class MultiHeadAttention(nn.Module):
         # Combine heads and apply output transformation
         output = self.W_o(self.combine_heads(attn_output))
         return output
+
+class PositionWiseFeedForward(nn.Module):
+    def __init__(self, d_model, d_ff):
+        # d_model: dimensionality of models input and output, d_ff: dimensionality of the inner layer in the feedforward network
+        super(PositionWiseFeedForward, self).__init__()
+        self.fc1 = nn.Linear(d_model, d_ff) # First linear layer to project to inner layer
+        self.fc2 = nn.Linear(d_ff, d_model) # Second linear layer to project back to original dimension
+        self.relu = nn.ReLU() # Rectified Linear Unit activation function
+
+    def forward(self, x):
+        return self.fc2(self.relu(self.fc1(x))) # First linear layer, ReLU activation, then second linear layer
+
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_seq_length):
+        #max_seq_length: maximum sequence length for the positional encoding
+        super(PositionalEncoding, self).__init__()
+
+        #pe: A tensor filled with zeros, which will be populated with positional encodings
+        pe = torch.zeroes(max_seq_length, d_model)
+        # position: A tensor containing the position indices for each position in the sequence
+        position = torch.arange(0, max_seq_length, dtype=torch.float).unsqueeze(1)
+        # div_term: A term used to scale the position indices in a specific way
+        div_term = torch.exp(torch.arrange(0, d_model, 2).float() * -(math.log(10000.0) / d_model))
+
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        
+        self.register_buffer('pe', pe.unsqueeze(0))
+
+    def forward(self, x):
+        return x + self.pe[:, :x.size(1)]
+        
