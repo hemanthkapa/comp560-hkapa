@@ -32,3 +32,7 @@ $$\text{softmax}(z_i) = \frac{e^{z_i}}{\sum_{j=1}^{n} e^{z_j}}$$
 
 - so larger scores get higher probability but every class gets some non-negative share.
 
+- Drop out rate: probability that a given neuron is randomly set to zero during a training step to reduce the overfitting. 
+
+
+
