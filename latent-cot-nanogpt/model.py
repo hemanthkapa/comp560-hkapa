@@ -114,6 +114,7 @@ class GPTConfig:
     n_embd: int = 768
     dropout: float = 0.0
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    n_loop: int = 1 # number of times to loop the block
 
 class GPT(nn.Module):
 
@@ -328,3 +329,32 @@ class GPT(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1)
 
         return idx
+
+class LoopedGPT(GPT):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def forward(self, idx, targets=None):
+        device = idx.device
+        b, t = idx.size()
+        assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
+        pos = torch.arange(0, t, dtype=torch.long, device=device)
+        
+        tok_emb = self.transformer.wte(idx)
+        pos_emb = self.transformer.wpe(pos)
+        x = self.transformer.drop(tok_emb + pos_emb)
+        
+        for _ in range(self.config.n_loop):
+            for block in self.transformer.h:
+                x = block(x)
+                
+        x = self.transformer.ln_f(x) # shape (t, n_embd)
+
+        if targets is not None:
+            logits = self.lm_head(x)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+        else:
+            logits = self.lm_head(x[:, [-1], :])
+            loss = None
+
+        return logits, loss

@@ -9,7 +9,7 @@ import random
 import numpy as np
 
 MIN_DIGITS = 1
-MAX_DIGITS = 4
+MAX_DIGITS = 2
 
 target_length = 1_200_000
 target_length_val = 200_000
