@@ -333,6 +333,7 @@ class GPT(nn.Module):
 class LoopedGPT(GPT):
     def __init__(self, config):
         super().__init__(config)
+        self.loop_emb = nn.Embedding(config.n_loop, config.n_embd)
 
     def forward(self, idx, targets=None):
         device = idx.device
@@ -344,7 +345,8 @@ class LoopedGPT(GPT):
         pos_emb = self.transformer.wpe(pos)
         x = self.transformer.drop(tok_emb + pos_emb)
         
-        for _ in range(self.config.n_loop):
+        for i in range(self.config.n_loop):
+            x = x + self.loop_emb(torch.tensor(i, device=device))
             for block in self.transformer.h:
                 x = block(x)
                 
