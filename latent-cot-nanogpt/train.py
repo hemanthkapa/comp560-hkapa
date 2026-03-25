@@ -27,7 +27,7 @@ import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
-from model import GPTConfig, GPT, LoopedGPT
+from model import GPTConfig, GPT, MODEL_CLASSES
 
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
@@ -158,7 +158,7 @@ if init_from == 'scratch':
         print("defaulting to vocab_size of GPT-2 to 50304 (50257 rounded up for efficiency)")
     model_args['vocab_size'] = meta_vocab_size if meta_vocab_size is not None else 50304
     gptconf = GPTConfig(**model_args)
-    ModelClass = LoopedGPT if model_type == 'looped' else GPT
+    ModelClass = MODEL_CLASSES.get(model_type, GPT)
     model = ModelClass(gptconf)
 elif init_from == 'resume':
     print(f"Resuming training from {out_dir}")
@@ -168,11 +168,13 @@ elif init_from == 'resume':
     checkpoint_model_args = checkpoint['model_args']
     # force these config attributes to be equal otherwise we can't even resume training
     # the rest of the attributes (e.g. dropout) can stay as desired from command line
-    for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
+    for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size', 'n_loop']:
         model_args[k] = checkpoint_model_args[k]
+    # restore model_type from checkpoint if available
+    model_type = checkpoint.get('model_type', model_type)
     # create the model
     gptconf = GPTConfig(**model_args)
-    ModelClass = LoopedGPT if model_type == 'looped' else GPT
+    ModelClass = MODEL_CLASSES.get(model_type, GPT)
     model = ModelClass(gptconf)
     state_dict = checkpoint['model']
     # fix the keys of the state dictionary :(
@@ -284,6 +286,7 @@ while True:
                     'model': raw_model.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'model_args': model_args,
+                    'model_type': model_type,
                     'iter_num': iter_num,
                     'best_val_loss': best_val_loss,
                     'config': config,

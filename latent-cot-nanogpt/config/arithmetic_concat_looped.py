@@ -1,7 +1,7 @@
-# LoopedGPT with loop index embedding on arithmetic addition
-# 2 layers looped 4x = 8 effective layers, with loop-aware embedding
+# ConcatLoopedGPT: prepends a loop-index token for attention-based injection
+# 2 layers looped 4x = 8 effective layers
 
-out_dir = 'out/arithmetic_looped_emb'
+out_dir = 'out/arithmetic_concat_looped'
 eval_interval = 100
 eval_iters = 20
 log_interval = 10
@@ -17,8 +17,7 @@ gradient_accumulation_steps = 1
 batch_size = 64
 block_size = 32
 
-# looped model settings
-model_type = 'looped'
+model_type = 'concat_looped'
 n_layer = 2
 n_head = 4
 n_embd = 128

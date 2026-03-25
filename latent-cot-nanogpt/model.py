@@ -143,7 +143,7 @@ class GPT(nn.Module):
         # apply special scaled init to the residual projections, per GPT-2 paper
         for pn, p in self.named_parameters():
             if pn.endswith('c_proj.weight'):
-                torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
+                torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer * config.n_loop))
 
         # report number of parameters
         print("number of parameters: %.2fM" % (self.get_num_params()/1e6,))
@@ -334,23 +334,24 @@ class LoopedGPT(GPT):
     def __init__(self, config):
         super().__init__(config)
         self.loop_emb = nn.Embedding(config.n_loop, config.n_embd)
+        self.register_buffer('loop_indices', torch.arange(config.n_loop))
 
     def forward(self, idx, targets=None):
         device = idx.device
         b, t = idx.size()
         assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
         pos = torch.arange(0, t, dtype=torch.long, device=device)
-        
+
         tok_emb = self.transformer.wte(idx)
         pos_emb = self.transformer.wpe(pos)
         x = self.transformer.drop(tok_emb + pos_emb)
-        
+
         for i in range(self.config.n_loop):
-            x = x + self.loop_emb(torch.tensor(i, device=device))
+            x = x + self.loop_emb(self.loop_indices[i])
             for block in self.transformer.h:
                 x = block(x)
-                
-        x = self.transformer.ln_f(x) # shape (t, n_embd)
+
+        x = self.transformer.ln_f(x)
 
         if targets is not None:
             logits = self.lm_head(x)
@@ -360,3 +361,89 @@ class LoopedGPT(GPT):
             loss = None
 
         return logits, loss
+
+class ScaledLoopedGPT(GPT):
+    """LoopedGPT with a learned scalar gate on the loop embedding."""
+    def __init__(self, config):
+        super().__init__(config)
+        self.loop_emb = nn.Embedding(config.n_loop, config.n_embd)
+        self.loop_scale = nn.Parameter(torch.tensor(0.01))
+        self.register_buffer('loop_indices', torch.arange(config.n_loop))
+
+    def forward(self, idx, targets=None):
+        device = idx.device
+        b, t = idx.size()
+        assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
+        pos = torch.arange(0, t, dtype=torch.long, device=device)
+
+        tok_emb = self.transformer.wte(idx)
+        pos_emb = self.transformer.wpe(pos)
+        x = self.transformer.drop(tok_emb + pos_emb)
+
+        for i in range(self.config.n_loop):
+            x = x + self.loop_scale * self.loop_emb(self.loop_indices[i])
+            for block in self.transformer.h:
+                x = block(x)
+
+        x = self.transformer.ln_f(x)
+
+        if targets is not None:
+            logits = self.lm_head(x)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+        else:
+            logits = self.lm_head(x[:, [-1], :])
+            loss = None
+
+        return logits, loss
+
+class ConcatLoopedGPT(GPT):
+    """LoopedGPT that prepends a loop-index token for attention-based injection.
+    Prepends loop token to get length t+1, runs through blocks, then slices back to t.
+    Internally allocates block_size+1 for wpe/attention to accommodate the extra token."""
+    def __init__(self, config):
+        # Temporarily bump block_size by 1 so parent allocates wpe and attention
+        # buffers large enough for the prepended loop token.
+        orig_block_size = config.block_size
+        config.block_size = orig_block_size + 1
+        super().__init__(config)
+        config.block_size = orig_block_size  # restore logical block_size
+        self.config.block_size = orig_block_size
+        self.loop_token = nn.Embedding(config.n_loop, config.n_embd)
+        self.register_buffer('loop_indices', torch.arange(config.n_loop))
+
+    def forward(self, idx, targets=None):
+        device = idx.device
+        b, t = idx.size()
+        assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
+
+        pos = torch.arange(0, t, dtype=torch.long, device=device)
+
+        tok_emb = self.transformer.wte(idx)
+        pos_emb = self.transformer.wpe(pos)
+        x = self.transformer.drop(tok_emb + pos_emb)
+
+        for i in range(self.config.n_loop):
+            loop_tok = self.loop_token(self.loop_indices[i]).unsqueeze(0).unsqueeze(0).expand(b, 1, -1)
+            x_with_tok = torch.cat([loop_tok, x], dim=1)  # (b, t+1, n_embd)
+            for block in self.transformer.h:
+                x_with_tok = block(x_with_tok)
+            x = x_with_tok[:, 1:, :]  # strip loop token, back to (b, t, n_embd)
+
+        x = self.transformer.ln_f(x)
+
+        if targets is not None:
+            logits = self.lm_head(x)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+        else:
+            logits = self.lm_head(x[:, [-1], :])
+            loss = None
+
+        return logits, loss
+
+
+MODEL_CLASSES = {
+    'gpt': GPT,
+    'looped': LoopedGPT,
+    'scaled_looped': ScaledLoopedGPT,
+    'concat_looped': ConcatLoopedGPT,
+}

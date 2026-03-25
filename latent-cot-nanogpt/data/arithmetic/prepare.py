@@ -2,6 +2,7 @@
 Data generator for arithmetic (addition) tasks.
 Generates character-level addition problems: e.g., "123+45=168"
 Used for testing latent Chain-of-Thought reasoning.
+Ensures zero overlap between train and val sets.
 """
 import os
 import pickle
@@ -14,28 +15,52 @@ MAX_DIGITS = 2
 target_length = 1_200_000
 target_length_val = 200_000
 
-def generate_addition_problem():
-    """Generate a random addition problem and return as string."""
-    d1 = random.randint(10 ** (MIN_DIGITS - 1), 10 ** MAX_DIGITS - 1)
-    d2 = random.randint(10 ** (MIN_DIGITS - 1), 10 ** MAX_DIGITS - 1)
-    result = d1 + d2
-    return f"{d1}+{d2}={result}\n"
+random.seed(42)
 
+# Generate all unique (d1, d2) pairs, then shuffle and split
+lo = 10 ** (MIN_DIGITS - 1)
+hi = 10 ** MAX_DIGITS - 1
+all_pairs = [(d1, d2) for d1 in range(lo, hi + 1) for d2 in range(lo, hi + 1)]
+random.shuffle(all_pairs)
+
+# Reserve 20% of unique pairs for val, 80% for train
+split = int(len(all_pairs) * 0.8)
+train_pairs = all_pairs[:split]
+val_pairs = all_pairs[split:]
+
+print(f"Total unique pairs: {len(all_pairs)}")
+print(f"Train pairs: {len(train_pairs)}, Val pairs: {len(val_pairs)}")
+
+# Build training data by cycling through train_pairs
 lines = []
 total_length = 0
+idx = 0
 while total_length < target_length:
-    line = generate_addition_problem()
+    d1, d2 = train_pairs[idx % len(train_pairs)]
+    line = f"{d1}+{d2}={d1+d2}\n"
     lines.append(line)
     total_length += len(line)
+    idx += 1
 
+# Build val data by cycling through val_pairs
 val_lines = []
-total_length_val = 0
-while total_length_val < target_length_val:
-    line = generate_addition_problem()
+val_total = 0
+idx = 0
+while val_total < target_length_val:
+    d1, d2 = val_pairs[idx % len(val_pairs)]
+    line = f"{d1}+{d2}={d1+d2}\n"
     val_lines.append(line)
-    total_length_val += len(line)
+    val_total += len(line)
+    idx += 1
 
-print("First 20 lines of training data:")
+# Verify no overlap
+train_set = {line.strip() for line in lines}
+val_set = {line.strip() for line in val_lines}
+overlap = train_set & val_set
+assert len(overlap) == 0, f"Found {len(overlap)} overlapping problems!"
+print(f"Verified: 0 overlap between {len(train_set)} unique train and {len(val_set)} unique val problems")
+
+print("\nFirst 20 lines of training data:")
 for i in range(20):
     print(lines[i].strip())
 

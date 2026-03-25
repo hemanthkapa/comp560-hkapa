@@ -15,7 +15,7 @@ from collections import defaultdict
 from contextlib import nullcontext
 
 import torch
-from model import GPTConfig, GPT, LoopedGPT
+from model import GPTConfig, GPT, MODEL_CLASSES
 
 # -----------------------------------------------------------------------------
 # defaults (overridable via config file / CLI)
@@ -43,7 +43,9 @@ ctx = nullcontext() if device_type in ('cpu', 'mps') else torch.amp.autocast(dev
 ckpt_path = os.path.join(out_dir, 'ckpt.pt')
 checkpoint = torch.load(ckpt_path, map_location=device)
 gptconf = GPTConfig(**checkpoint['model_args'])
-ModelClass = LoopedGPT if model_type == 'looped' else GPT
+# restore model_type from checkpoint if available
+model_type = checkpoint.get('model_type', model_type)
+ModelClass = MODEL_CLASSES.get(model_type, GPT)
 model = ModelClass(gptconf)
 state_dict = checkpoint['model']
 unwanted_prefix = '_orig_mod.'
